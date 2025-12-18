@@ -1925,3 +1925,36 @@
     }
 
 </script>
+<script>
+    // 1. 禁止右键菜单
+    document.oncontextmenu = function() {
+        return false;
+    };
+
+    // 2. 禁止鼠标拖拽选中文字
+    document.onselectstart = function() {
+        return false;
+    };
+
+    // 3. 禁止 F12, Ctrl+U (查看源码), Ctrl+S (保存), Ctrl+Shift+I (开发者工具)
+    document.onkeydown = function(e) {
+        // F12
+        if (e.keyCode === 123) {
+            return false;
+        }
+        // Ctrl + U (查看源码)
+        if (e.ctrlKey && e.keyCode === 85) {
+            return false;
+        }
+        // Ctrl + S (保存网页)
+        if (e.ctrlKey && e.keyCode === 83) {
+            return false;
+        }
+        // Ctrl + Shift + I (开发者工具)
+        if (e.ctrlKey && e.shiftKey && e.keyCode === 73) {
+            return false;
+        }
+    };
+</script>
+</body>
+</html>
