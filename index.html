@@ -550,6 +550,18 @@
                 text-decoration: none;
                 padding-right: 0 !important;
                 cursor: default;
+
+                /* ★★★ 核心修复：强制弹窗标题在手机上恢复绝对居中 ★★★ */
+                position: absolute;
+                /* 重新开启绝对定位 */
+                left: 50%;
+                /* 定位到正中间 */
+                transform: translateX(-50%);
+                /* 修正中心点 */
+                margin: 0;
+                /* 清除被之前规则影响的边距 */
+                text-align: center;
+                /* 确保文字居中 */
             }
 
             /* 1. 让 Body 撑满屏幕，取消居中布局 */
@@ -1693,7 +1705,7 @@
                 <div class="window-controls">
                     <div class="win-btn close" onclick="closeModal()"></div>
                 </div>
-                <h1 style="margin:0 auto; padding-right:30px;">System Alert</h1>
+                <h1 style="margin:0;">System Alert</h1>
                 <div></div>
             </div>
 
