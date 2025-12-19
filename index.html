@@ -466,12 +466,23 @@
 
             /* ★★★ 新增：只在手机上把标题变成可点击的样子 ★★★ */
             .header h1 {
-                cursor: pointer;
-                /* 显示手指图标 */
+                /* cursor: pointer;  <-- 删掉或注释掉这行，手机上不需要手型 */
                 user-select: none;
-                /* 防止点击时选中文字，体验像按钮一样 */
-                text-decoration: underline dotted #666;
-                /* 可选：加个虚线让它稍微明显一点点，不喜欢可以删掉这行 */
+                
+                /* 1. 去掉原本的虚线 */
+                text-decoration: none; 
+                border-bottom: none;
+
+                /* 2. 强制居中 */
+                flex: 1;            /* 让标题占据中间剩余空间 */
+                text-align: center; /* 文字水平居中 */
+                margin: 0;          /* 清除默认边距 */
+            }
+            
+            /* ★★★ 新增：防止手机端把弹窗的关闭按钮也隐藏了 ★★★ */
+            /* 原本的代码把所有 .window-controls 都隐藏了，我们要把弹窗里的显示出来 */
+            .modal-window .window-controls {
+                display: flex !important;
             }
 
             /* 1. 让 Body 撑满屏幕，取消居中布局 */
@@ -1623,7 +1634,7 @@
                 <div class="window-controls">
                     <div class="win-btn close" onclick="closeModal()"></div>
                 </div>
-                <h1 style="margin:0 auto; padding-right:30px;">System Alert</h1>
+                <h1 style="margin:0 auto;">System Alert</h1>
                 <div></div>
             </div>
 
