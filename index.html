@@ -536,6 +536,67 @@
                 display: none;
             }
         }
+
+        /* =========================================
+           自定义模态弹窗 (Custom Modal)
+           ========================================= */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            /* 半透明遮罩 */
+            backdrop-filter: blur(2px);
+            /* 背景模糊效果 */
+            z-index: 9999;
+            display: none;
+            /* 默认隐藏 */
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 复用 window-frame 样式，但做微调 */
+        .modal-window {
+            width: 300px;
+            height: auto;
+            max-width: 90%;
+            background: #ececec;
+            border-radius: 5px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: aquaPop 0.2s cubic-bezier(0.15, 1, 0.5, 1);
+        }
+
+        .modal-content {
+            padding: 15px 20px 15px 20px;
+            /* 上15px, 右20px, 下10px, 左20px */
+            text-align: center;
+            font-size: 13px;
+            /* 字体稍微改小一号更精致 */
+            color: #333;
+            line-height: 1.4;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 0 20px 15px 20px;
+            /* 底部留白减少到 15px */
+        }
+
+        /* 专门给取消按钮用的样式 */
+        button.secondary {
+            background: linear-gradient(to bottom, #f9f9f9 0%, #dcdcdc 100%);
+        }
+
+        .modal-window .win-btn.close:hover {
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -1521,27 +1582,64 @@
         loadChatHistory();
 
         // =========================================
-        // 🔴 红灯重置系统
+        // 🔴 新版重置系统 (自定义弹窗版)
         // =========================================
+
+        // 1. 点击删除按钮时，只负责显示弹窗
         function resetSystem() {
-            // 1. 弹出确认框，防止手滑误删
-            const isConfirmed = confirm("【系统警告】\n\n确定要关闭当前会话吗？\n这将清除所有聊天记录和 AI 对你的记忆。");
-
-            if (isConfirmed) {
-                // 2. 播放一个清空音效（可选，这里复用发送音效，听起来像操作成功）
-                if (typeof playSound === 'function') playSound('sent');
-
-                // 3. 清除所有相关的本地存储
-                localStorage.removeItem('chat_logs');        // 清除聊天历史
-                localStorage.removeItem('neural_lite_memory'); // 清除 AI 记忆(名字/心情)
-
-                // 4. 刷新页面，让 AI 重新初始化
-                setTimeout(() => {
-                    location.reload();
-                }, 300); // 稍微延迟一点点，让用户感觉到操作发生了
-            }
+            const modal = document.getElementById('custom-modal');
+            modal.style.display = 'flex';
+            // 播放一个警告音效（可选）
+            if (typeof playSound === 'function') playSound('recv');
         }
+
+        // 2. 关闭弹窗
+        function closeModal() {
+            document.getElementById('custom-modal').style.display = 'none';
+        }
+
+        // 3. 用户真正点击了弹窗里的“清除”按钮
+        function confirmResetAction() {
+            // 关闭弹窗
+            closeModal();
+
+            // 播放清空音效
+            if (typeof playSound === 'function') playSound('sent');
+
+            // 执行清除逻辑
+            localStorage.removeItem('chat_logs');        // 清除聊天历史
+            localStorage.removeItem('neural_lite_memory'); // 清除 AI 记忆
+
+            // 稍微延迟后刷新，让用户感觉到操作发生
+            setTimeout(() => {
+                location.reload();
+            }, 300);
+        }
+
     </script>
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="header">
+                <div class="window-controls">
+                    <div class="win-btn close" onclick="closeModal()"></div>
+                </div>
+                <h1 style="margin:0 auto; padding-right:30px;">System Alert</h1>
+                <div></div>
+            </div>
+
+            <div class="modal-content">
+                <p style="margin: 0;">
+                    <b>确定要清除记忆吗？</b>
+                    <br><span style="font-size: 0.9em; opacity: 0.8;">这将删除所有聊天记录，且无法恢复。</span>
+                </p>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="secondary" onclick="closeModal()">取消</button>
+                <button class="primary" onclick="confirmResetAction()">清除</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
