@@ -21,13 +21,22 @@
         body {
             font-family: "Lucida Grande", "Lucida Sans Unicode", "STHeiti", "华文黑体", Helvetica, Arial, sans-serif;
             background-color: #c5c5c5;
-            /* 经典的 OS X 条纹背景 */
+
+            /* === 修改部分：增粗且降低白度 === */
             background-image: repeating-linear-gradient(0deg,
                     transparent,
-                    transparent 1px,
-                    #dcdcdc 1px,
-                    #dcdcdc 2px);
-            background-size: 100% 4px;
+                    transparent 5px,
+                    /* 0px 到 5px 是透明背景 (间距变小了一点，为线条腾空间) */
+                    rgba(255, 255, 255, 0.3) 5px,
+                    /* 起点：颜色改为 30% 透明度的白色 */
+                    rgba(255, 255, 255, 0.3) 7px
+                    /* 终点：5px 到 7px 是线条 (现在是 2px 粗) */
+                );
+
+            background-size: 100% 7px;
+            /* 保持总高度 7px 不变 */
+            /* === 修改结束 === */
+
             height: 100vh;
             margin: 0;
             display: flex;
@@ -510,9 +519,65 @@
         }
 
         /* =========================================
-           移动端适配 (Mobile Responsive)
-           屏幕宽度小于 768px 时生效
-           ========================================= */
+   🍎 iPad 最终版：绝对居中 + 直角 + 拟物纹理增强
+   识别范围：宽度 768px 到 1366px
+   ========================================= */
+        @media screen and (min-width: 768px) and (max-width: 1366px) {
+
+            /* iPad 必须加上 !important 才能生效 */
+            body {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+
+                /* === 核心修改：与上面保持一致 === */
+                background-color: #c5c5c5 !important;
+
+                background-image: repeating-linear-gradient(0deg,
+                        transparent,
+                        transparent 5px,
+                        /* 间距 */
+                        rgba(255, 255, 255, 0.3) 5px,
+                        /* 线条颜色 (RGBA半透明) */
+                        rgba(255, 255, 255, 0.3) 7px
+                        /* 线条结束位置 (2px粗) */
+                    ) !important;
+
+                background-size: 100% 7px !important;
+            }
+
+            /* 2. 窗口：直角 + 居中尺寸 */
+            .window-frame {
+                /* 1. 尺寸设定（保持不变） */
+                width: 85% !important;
+                height: 80% !important;
+                max-width: 700px !important;
+                max-height: 900px !important;
+
+                /* 2. 核心修改：微小的曲角 */
+                /* 原来是 0 (直角)，现在改为 4px 或 5px，恢复圆润感 */
+                border-radius: 4px !important;
+
+                /* 3. 核心修改：黑色的拟物化边框 */
+                /* 第一行：0 20px 50px... 是大的浮空投影
+       第二行：0 0 0 1px... 是关键，这是一个 1px 宽的深色“内描边”，模拟物理边框
+    */
+                box-shadow:
+                    0 20px 50px rgba(0, 0, 0, 0.5),
+                    0 0 0 1px rgba(0, 0, 0, 0.5) !important;
+
+                /* 4. 布局重置（保持不变） */
+                margin: 0 !important;
+                position: static !important;
+                transform: none !important;
+                top: 0 !important;
+            }
+        }
+
         /* =========================================
            移动端适配 (Mobile Responsive)
            屏幕宽度小于 768px 时生效
