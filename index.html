@@ -147,18 +147,25 @@
 
         /* 状态栏文字样式保持不变，微调阴影增强凹陷感 */
         .status {
+            /* 1. 颜色字体保持不变 */
             font-size: 11px;
             color: #444;
             text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
-            margin-left: 5px;
-            width: 130px;
-            /* 1. 给一个固定的宽度 (能容纳下最长文字即可) */
-            text-align: right;
-            /* 2. 让文字靠右对齐，锚定在右侧窗口边缘 */
+
+            /* 2. 核心：给一个足够大的固定宽度 */
+            width: 95px;
+
+            /* 3. 重点：改为【左对齐】*/
+            /* 之前的右对齐会导致数字变长时，整行字向左挤，所以会跳 */
+            /* 左对齐后，文字起点固定不动，数字变长只是向右延伸到空白处，视觉上完全静止 */
+            text-align: left;
+
+            /* 4. 防止被挤压的其他设置 */
+            margin-left: 10px;
             white-space: nowrap;
-            /* 3. 禁止文字换行 */
-            overflow: hidden;
-            /* 4. 防止意外溢出 */
+            display: flex;
+            align-items: center;
+            /* 垂直居中 */
         }
 
         /* 聊天主窗口 - 类似 iChat */
