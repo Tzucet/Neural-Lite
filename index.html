@@ -713,7 +713,7 @@
         }
         // 监听错误事件：如果当前源加载失败，自动切换下一个
         audioRecv.onerror = function () {
-            console.warn(`⚠️ 音效源 [${currentSrcIndex}] 加载失败，正在尝试备用源...`);
+            console.warn(`音效源 [${currentSrcIndex}] 加载失败，正在尝试备用源...`);
             currentSrcIndex++; // 索引+1
             loadRecvAudio();   // 递归加载下一个
         };
