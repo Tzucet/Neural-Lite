@@ -503,6 +503,18 @@
                 /* 可选：加个虚线让它稍微明显一点点，不喜欢可以删掉这行 */
             }
 
+            /* === 在这里插入新代码 === */
+
+            /* 修正手机端模态窗口标题样式 */
+            .modal-window .header h1 {
+                text-decoration: none;
+                /* 去掉黑色虚线 */
+                padding-right: 0 !important;
+                /* 强制去掉右侧留白，让标题完全居中 */
+                cursor: default;
+                /* 恢复鼠标样式 */
+            }
+
             /* 1. 让 Body 撑满屏幕，取消居中布局 */
             body {
                 height: 100%;
@@ -1659,7 +1671,7 @@
             <div class="modal-content">
                 <p style="margin: 0;">
                     <b>确定要清除记忆吗？</b>
-                    <br><span style="font-size: 0.9em; opacity: 0.8;">这将删除所有聊天记录，且无法恢复。</span>
+                    <br><span style="font-size: 0.9em; opacity: 0.8;">这将删除所有聊天记录，且无法恢复</span>
                 </p>
             </div>
 
