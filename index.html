@@ -513,69 +513,72 @@
            移动端适配 (Mobile Responsive)
            屏幕宽度小于 768px 时生效
            ========================================= */
+        /* =========================================
+           移动端适配 (Mobile Responsive)
+           屏幕宽度小于 768px 时生效
+           ========================================= */
         @media screen and (max-width: 768px) {
 
             /* ★★★ 新增：只在手机上把标题变成可点击的样子 ★★★ */
+            /* ★★★ 修改：手机端标题移到左边 ★★★ */
             .header h1 {
+                /* 原有的交互样式 */
                 cursor: pointer;
-                /* 显示手指图标 */
                 user-select: none;
-                /* 防止点击时选中文字，体验像按钮一样 */
                 text-decoration: underline dotted #666;
-                /* 可选：加个虚线让它稍微明显一点点，不喜欢可以删掉这行 */
+
+                /* === 新增：取消绝对定位，让它自然靠左 === */
+                position: static;
+                /* 取消悬浮定位 */
+                transform: none;
+                /* 取消位移修正 */
+                left: auto;
+                /* 取消左边距计算 */
+                margin: 0;
+                /* 清除可能存在的外边距 */
             }
 
             /* === 在这里插入新代码 === */
 
+            /* ★★★ 核心修改：强制将状态栏推到右侧 ★★★ */
+            .status {
+                margin-left: auto;
+            }
+
             /* 修正手机端模态窗口标题样式 */
             .modal-window .header h1 {
                 text-decoration: none;
-                /* 去掉黑色虚线 */
                 padding-right: 0 !important;
-                /* 强制去掉右侧留白，让标题完全居中 */
                 cursor: default;
-                /* 恢复鼠标样式 */
             }
 
             /* 1. 让 Body 撑满屏幕，取消居中布局 */
             body {
                 height: 100%;
-                /* 防止键盘弹出时挤压 */
                 display: block;
-                /* 取消 Flex 居中 */
                 background: #ececec;
-                /* 背景色改为窗口底色，防止露馅 */
             }
 
             /* 2. 窗口框架：取消悬浮感，改为全屏铺满 */
             .window-frame {
                 width: 100%;
                 height: 100vh;
-                /* 强制全高 */
                 height: 100dvh;
-                /* 针对移动端动态地址栏的优化 */
                 max-width: none;
-                /* 取消最大宽度限制 */
                 border-radius: 0;
-                /* 取消圆角 */
                 box-shadow: none;
-                /* 取消阴影 */
             }
 
             /* 3. 调整气泡宽度，手机屏幕窄，需要利用更多空间 */
             .bubble {
                 max-width: 85%;
-                /* 电脑是 70%，手机改宽一点 */
                 font-size: 15px;
-                /* 字体稍微大一点更易读 */
                 padding: 10px 18px;
-                /* 增大手指点击/视觉区域 */
             }
 
             /* 4. 头部优化 */
             .header {
                 height: 44px;
-                /* iOS 标准触控高度 */
             }
 
             .header h1 {
@@ -585,16 +588,14 @@
             /* 5. 关键：防止 iOS Safari 输入框自动放大 */
             input {
                 font-size: 16px;
-                /* 小于 16px 会触发 iOS 放大镜效果，导致布局错乱 */
             }
 
             /* 6. 输入区域适配 */
             .input-wrapper {
                 padding: 8px 10px;
-                /* 减少左右边距 */
             }
 
-            /* 隐藏非必要的装饰（可选），比如窗口控制红绿灯按钮在手机上没用 */
+            /* 隐藏非必要的装饰，比如窗口控制红绿灯按钮在手机上没用 */
             .window-controls {
                 display: none;
             }
