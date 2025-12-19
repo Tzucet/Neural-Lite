@@ -354,25 +354,54 @@
         }
 
         /* 拟物化按钮 (Gel Button) */
+        /* 拟物化按钮 (Gel Button) - 终极防抖版 */
         button {
             font-family: "Lucida Grande", "Lucida Sans Unicode", "STHeiti", "华文黑体", sans-serif;
-            /* 新增这一行 */
             background: linear-gradient(to bottom, #ffffff 0%, #f1f1f1 49%, #e1e1e1 51%, #f6f6f6 100%);
             color: #333;
             border: 1px solid #888;
-            padding: 5px 20px;
             border-radius: 15px;
             font-weight: bold;
             font-size: 12px;
             cursor: pointer;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 1);
             text-shadow: 0 1px 0 #fff;
-            transition: all 0.1s;
+
+            /* --- 核心修复开始 --- */
+            /* 1. 使用 Flex 布局强制居中，不再依赖 padding 挤压 */
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+
+            /* 2. 锁定高度和行高，彻底消除位移空间 */
+            height: 28px;
+            /* 固定高度 (根据原本的字体+padding推算) */
+            line-height: 1;
+            /* 锁定行高为 1，防止文字自带间距变化 */
+            padding: 0 20px;
+            /* 上下 padding 设为 0，只留左右 */
+            box-sizing: border-box;
+            /* 确保边框计算在内 */
+
+            /* 3. 禁止系统默认外观干扰 */
+            -webkit-appearance: none;
+            appearance: none;
+
+            /* 4. 只针对背景和阴影做动画，忽略文字位置 */
+            transition: background 0.1s, box-shadow 0.1s;
+            /* --- 核心修复结束 --- */
         }
 
         button:active {
             background: linear-gradient(to bottom, #d0d0d0 0%, #e0e0e0 100%);
             box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+
+            /* 强制锁定位置，防止任何位移 */
+            padding: 0 20px !important;
+            transform: none !important;
+            margin: 0 !important;
+            border: 1px solid #888 !important;
+            /* 防止边框宽度变化导致抖动 */
         }
 
         /* 蓝色主按钮变体 */
