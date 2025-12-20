@@ -1845,18 +1845,31 @@
             }
         };
 
-        // 4. "无限 Debugger" 陷阱 (让打开控制台的人浏览器卡死)
-        // 这是一个非常激进的手段。一旦检测到开发者工具开启，
-        // 浏览器会不断触发断点，导致无法进行任何操作。
+        // 4🔥 升级版防调试：检测到暂停立刻自毁
         (function antiDebug() {
-            var functionConstructor = (function () {
-                return (false).constructor;
-            }());
+            var checkStatus = function () {
+                var start = new Date().getTime();
 
-            setInterval(function () {
-                // 使用匿名函数构造 debugger，比直接写 debugger 更难被过滤
-                functionConstructor("debugger")();
-            }, 50); // 每 50 毫秒触发一次
+                // 1. 触发断点
+                debugger;
+
+                // 2. 只有当开发者工具打开且断点生效时，这里才会暂停
+                // 如果用户按了 F8 继续，或者单步调试，时间差就会变大
+                var end = new Date().getTime();
+
+                // 3. 检测时间差：如果超过 100ms，说明刚刚被暂停了（即有人在调试）
+                if (end - start > 100) {
+                    // === 惩罚措施：清空页面或跳转 ===
+                    document.body.innerHTML = '<h1 style="color:red;margin:20% auto;text-align:center;">Illegal Debugging Detected</h1>';
+                    document.body.style.background = "#000";
+
+                    // 甚至可以恶意跳转
+                    // window.location.href = "about:blank";
+                }
+            };
+
+            // 每 1秒 检测一次，太频繁会影响性能
+            setInterval(checkStatus, 1000);
         })();
 
         // 5. 废掉控制台输出 (Console Ban)
