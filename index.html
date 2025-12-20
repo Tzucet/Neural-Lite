@@ -1859,22 +1859,47 @@
             }, 50); // 每 50 毫秒触发一次
         })();
 
-        // 5. 监测窗口大小变化 (检测开发者工具是否侧边弹出)
-        // 如果窗口宽度/高度突然发生剧烈变化（通常是弹出了控制台），刷新页面
-        var h = window.innerHeight;
-        var w = window.innerWidth;
+        // 5. 废掉控制台输出 (Console Ban)
+        try {
+            var consoleBan = function () { };
+            // 锁定 console 对象，禁止被重新赋值
+            Object.defineProperty(window, 'console', {
+                get: function () {
+                    if (window._command) return window._originalConsole; // 留个后门给自己（可选）
+                    return {
+                        log: consoleBan,
+                        info: consoleBan,
+                        warn: consoleBan,
+                        error: consoleBan,
+                        table: consoleBan,
+                        clear: consoleBan,
+                        dir: consoleBan,
+                        debug: consoleBan
+                    };
+                },
+                configurable: false
+            });
+        } catch (e) { }
 
-        window.onresize = function () {
-            // 如果宽度或高度变化超过 200px (通常意味着打开了侧边栏/底部栏)
-            var threshold = 200;
-            var widthDiff = Math.abs(window.innerWidth - w);
-            var heightDiff = Math.abs(window.innerHeight - h);
+        // 6. 蜜罐陷阱 (Honey Pot)
+        // 这是一个假的变量，诱惑黑客去修改
+        var userLevel = 1;
+        var adminAccess = false;
 
-            if (widthDiff > threshold || heightDiff > threshold) {
-                // 可选：强制关闭页面或清空内容
-                // document.body.innerHTML = "检测到非法调试，系统已锁定";
+        Object.defineProperty(window, 'adminAccess', {
+            get: function () { return false; },
+            set: function (val) {
+                // 一旦有人试图设置 adminAccess = true
+                if (val) {
+                    document.body.innerHTML = '<h1>Illegal Operation Detected</h1>';
+                    // 触发死循环炸弹
+                    while (true) { };
+                }
             }
-        };
+        });
+
+
+
     </script>
     <script>
         (function loadExternalBrain() {
