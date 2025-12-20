@@ -3,6 +3,12 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
+               script-src 'self' 'unsafe-inline'; 
+               style-src 'self' 'unsafe-inline'; 
+               connect-src 'self' data:; 
+               img-src 'self' data:; 
+               media-src 'self' data:;">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content, maximum-scale=1.0, user-scalable=no">
     <title>Neural-Lite</title>
@@ -181,14 +187,16 @@
         #chat-container {
             flex: 1;
             overflow-y: auto;
+            /* 恢复自动滚动条 */
             padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 15px;
             background: #fff;
-            /* iChat 白色背景 */
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
             scroll-behavior: smooth;
+            scrollbar-gutter: stable;
+            /* 关键：开启平滑滚动 */
         }
 
         /* 滚动条拟物化 */
@@ -500,7 +508,7 @@
            cubic-bezier(0.15, 1, 0.5, 1): 经典的 Apple "Ease-Out" 曲线，
            起步快，结束时有非常平滑的减速，类似物理惯性。
         */
-            animation: aquaPop 0.35s cubic-bezier(0.15, 1, 0.5, 1) forwards;
+            animation: aquaPop 0.5s cubic-bezier(0.15, 1, 0.5, 1) forwards;
             /* 初始状态设为不可见，防止动画加载前闪现 */
             opacity: 0;
             /* 设置变换原点为底部，让气泡看起来是从下往上长出来的 */
@@ -650,7 +658,7 @@
             .bubble {
                 max-width: 85%;
                 font-size: 15px;
-                padding: 10px 18px;
+                padding: 9px 14px;
             }
 
             /* 4. 头部优化 */
@@ -742,6 +750,14 @@
 </head>
 
 <body>
+    <script>
+        // 这是一个“调试器陷阱”
+        // 一旦有人打开 F12 开发者工具，浏览器就会每 100 毫秒强制暂停在这里
+        // 让他根本没法正常操作页面，不得不关闭 F12
+        setInterval(function () {
+            debugger;
+        }, 100);
+    </script>
     <div class="window-frame">
         <div class="header">
             <div class="window-controls">
@@ -784,8 +800,9 @@
         </div>
         <div class="input-wrapper">
             <div class="input-box">
-                <input type="text" id="user-input" placeholder="在此输入消息..." onkeypress="handleEnter(event)">
-                <button class="primary" onclick="sendMessage()">发送</button>
+                <input type="text" id="user-input" maxlength="200" placeholder="在此输入消息..."
+                    onkeypress="handleEnter(event)">
+                <button id="send-btn" class="primary">发送</button>
             </div>
         </div>
     </div>
@@ -1313,11 +1330,18 @@
                 const saved = localStorage.getItem('neural_lite_memory');
                 if (saved) {
                     try {
-                        // 合并保存的数据，防止旧数据缺少新字段
                         const parsed = JSON.parse(saved);
-                        this.memory = { ...this.memory, ...parsed };
+                        // 简单校验：确保解析出来的是个对象，而不是 null 或数组
+                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                            // 安全合并
+                            this.memory = { ...this.memory, ...parsed };
+                            // 强制修正 mood 范围（防止被修改成 99999）
+                            if (this.memory.mood > 5) this.memory.mood = 5;
+                            if (this.memory.mood < -5) this.memory.mood = -5;
+                        }
                     } catch (e) {
-                        console.error("读取记忆失败:", e);
+                        console.error("记忆文件损坏，重置为默认");
+                        // 可选：localStorage.removeItem('neural_lite_memory');
                     }
                 }
             }
@@ -1586,16 +1610,65 @@
                 return text;
             }
             tryLogic(input) {
-                if (/[\d]+.*[\+\-\*\/]/.test(input) && !input.includes("日期")) {
+                // 移除这一行松散的检查：if (/[\d]+.*[\+\-\*\/]/.test(input) ...
+
+                // 使用严格的“白名单”正则
+                // 允许：数字、加减乘除、小数点、括号、空格
+                // ^ 表示开始，$ 表示结束，确保整个字符串只包含这些字符
+                const mathRegex = /^[\d\+\-\*\/\.\(\)\s]+$/;
+
+                // 排除纯数字（避免输入年份变成计算）和包含日期的请求
+                if (mathRegex.test(input) && !/^\d+$/.test(input) && !input.includes("日期")) {
                     try {
-                        const safeExpr = input.match(/[\d\+\-\*\/\.\(\) ]+/)[0];
-                        const res = new Function(`return ${safeExpr}`)();
-                        return `应该是${res}吧，如果我没算错的话。`;
-                    } catch (e) { return null; }
+                        // 二次检查：防止像 "1++1" 这种语法错误导致程序崩溃
+                        // 虽然 Function 比较危险，但既然上面已经用 Regex 严格限制了字符集，
+                        // 这里执行任意代码的可能性几乎为零。
+                        const res = new Function(`"use strict"; return (${input})`)();
+
+                        // 检查结果是否为有效数字 (排除 Infinity 或 NaN)
+                        if (isFinite(res)) {
+                            return `应该是 ${res} 吧，如果我没算错的话。`;
+                        }
+                    } catch (e) {
+                        return null;
+                    }
                 }
                 return null;
             }
         }
+        // =========================================
+        // 📌 键盘防抖动核心 (iOS iMessage 风格)
+        // =========================================
+        (function initSendButton() {
+            const sendBtn = document.getElementById('send-btn');
+            const input = document.getElementById('user-input');
+
+            // 定义发送逻辑
+            const handleSend = (e) => {
+                // 1. 阻止默认事件：这是核心！
+                // 这会阻止按钮获取焦点，从而防止输入框失去焦点
+                // 进而阻止键盘收起。
+                e.preventDefault();
+
+                // 2. 执行发送
+                sendMessage();
+
+                // 3. 双重保险：强制让输入框保持聚焦
+                // 虽然 preventDefault 应该已经够了，但这行能解决某些安卓机的兼容性问题
+                setTimeout(() => {
+                    input.focus();
+                }, 0);
+            };
+
+            // 监听触摸开始 (手机端响应最快，要在手指抬起前就拦截)
+            sendBtn.addEventListener('touchstart', handleSend, { passive: false });
+
+            // 监听鼠标按下 (兼容电脑端，防止点击导致失焦)
+            sendBtn.addEventListener('mousedown', handleSend);
+
+            // 注意：不要再监听 'click'，因为 touchstart 里的 preventDefault 会阻止后续的 click 触发
+            // 这样就避免了发两条消息的问题
+        })();
         // =========================================================
         // 3️⃣ UI 交互 (模拟真人打字效果)
         // =========================================================
@@ -1612,6 +1685,7 @@
             playSound('sent');
             // 1. 显示用户气泡
             addBubble(text, 'user');
+
             userInput.value = '';
             // 更新状态栏
             statusDiv.innerText = `当前索引数量: ${brain.db.length}`;
@@ -1644,26 +1718,51 @@
             const row = document.createElement('div');
             row.className = `message-row ${role}`;
 
-            // 🔊 只有当不是加载历史记录时，才播放音效
             if (role === 'ai' && !isHistory) {
                 playSound('recv');
             }
 
-            const avatar = `<div class="avatar ${role}-avatar">${role === 'ai' ? 'AI' : 'Me'}</div>`;
-            const formattedText = escapeHTML(text).replace(/\n/g, '<br>');
-            const bubble = `<div class="bubble ${role}-bubble">${formattedText}</div>`;
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `avatar ${role}-avatar`;
+            avatarDiv.textContent = role === 'ai' ? 'AI' : 'Me';
 
-            row.innerHTML = role === 'ai' ? avatar + bubble : bubble + avatar;
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = `bubble ${role}-bubble`;
+
+            // ★★★ 最终修正：无论是否有 <ul>，一律作为纯文本处理 ★★★
+            // 配合 CSS 的 white-space: pre-wrap，列表可以用换行符 \n 来模拟
+            bubbleDiv.textContent = text;
+
+            // 删除掉之前那个 if (text.includes('<ul>')) ... innerHTML 的块
+
+            if (role === 'ai') {
+                row.appendChild(avatarDiv);
+                row.appendChild(bubbleDiv);
+            } else {
+                row.appendChild(bubbleDiv);
+                row.appendChild(avatarDiv);
+            }
+
             chatBox.appendChild(row);
             scrollToBottom();
 
-            // ★★★ 新增：如果这不是历史记录，就把它保存到本地 ★★★
             if (!isHistory) {
                 saveChatLog(text, role);
             }
         }
         function scrollToBottom() {
-            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+            const chatBox = document.getElementById('chat-container');
+
+            // 计算误差阈值（手机屏幕有时候有小数点的像素误差）
+            const threshold = 5;
+
+            // 只有当 [内容总高度] 超过 [可视高度 + 阈值] 时，才执行滚动
+            if (chatBox.scrollHeight > chatBox.clientHeight + threshold) {
+                chatBox.scrollTo({
+                    top: chatBox.scrollHeight,
+                    behavior: 'auto' // 保持瞬间定位，防止动画导致的视觉漂移
+                });
+            }
         }
         // =========================================
         // 📱 移动端键盘适配 (Visual Viewport Fix)
