@@ -3,12 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
-               script-src 'self' 'unsafe-inline'; 
-               style-src 'self' 'unsafe-inline'; 
-               connect-src 'self' data:; 
-               img-src 'self' data:; 
-               media-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob:; style-src * 'unsafe-inline'; frame-src *;">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content, maximum-scale=1.0, user-scalable=no">
     <title>Neural-Lite</title>
@@ -838,22 +834,40 @@
             recv: null
         };
 
+        // =========================================================
+        // 修复后的音频加载系统 (不依赖 fetch，更稳定)
+        // =========================================================
+
+        // 辅助函数：将 Base64 字符串转换为 ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            // 去掉前缀 "data:audio/mp3;base64," 如果存在的话
+            const base64String = base64.split(',')[1] || base64;
+            const binaryString = window.atob(base64String);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
         // 3. 预解码函数：页面加载时就把 Base64 转换成内存波形
         async function initAudioSystem() {
-            const decode = async (key, base64Str) => {
+            const decode = (key, base64Str) => {
                 try {
-                    // 使用 fetch 读取 Base64
-                    const res = await fetch(base64Str);
-                    const arrayBuffer = await res.arrayBuffer();
-                    // 解码为音频数据 (最耗时的步骤在这里完成)
+                    // 1. 转换 Base64 为二进制 Buffer
+                    const arrayBuffer = base64ToArrayBuffer(base64Str);
+
+                    // 2. 解码音频
                     audioCtx.decodeAudioData(arrayBuffer, (decoded) => {
                         soundBuffers[key] = decoded;
-                        console.log(`✅ [音效] ${key} 预解码完成`);
+                        // 恢复控制台后，这里能看到成功提示
+                        if (window.console && console.log) console.log(`✅ [音效] ${key} 预解码完成`);
                     }, (err) => {
-                        console.error(`❌ [音效] ${key} 解码失败`, err);
+                        if (window.console && console.error) console.error(`❌ [音效] ${key} 解码失败: 数据损坏或格式不支持`, err);
                     });
                 } catch (e) {
-                    console.error(`❌ [音效] ${key} 读取错误`, e);
+                    if (window.console && console.error) console.error(`❌ [音效] ${key} 转换错误`, e);
                 }
             };
             // 并行处理
@@ -1358,36 +1372,321 @@
                     }
                 }
             }
+            async checkWeather(input) {
+                // 1. 触发检测
+                if (!input.includes("天气") && !input.includes("气温") && !input.includes("多少度")) {
+                    return null;
+                }
+
+                // 2. 提取城市名
+                let city = input.replace(/天气|气温|多少度|怎么样|查询|查一下|今天|现在|的|我|想|知道|看看|这里|那里|环境|指数|空气|质量|预报/g, "").trim();
+                if (!city || city.length === 0) city = "北京";
+
+                console.log(`🔍 [调试] 目标城市: "${city}"`);
+
+                // 3. 提示消息
+                await new Promise(resolve => setTimeout(resolve, 600));
+                addBubble(`正在连接气象卫星读取${city}的数据...`, 'ai');
+                if (typeof playSound === 'function') playSound('recv');
+                // =========== 👇【修改处 1：插入开始】👇 ===========
+                // 设置一个 7秒 的倒计时，如果时间到了还没被清除，就发提示
+                const waitTimer = setTimeout(() => {
+                    addBubble("正在处理数据中，请耐心等待", 'ai');
+                    if (typeof playSound === 'function') playSound('recv');
+                }, 7000);
+                // =========== 👆【修改处 1：插入结束】👆 ===========
+
+                try {
+                    // ============================================
+                    // 🌤️ 第1步：获取人性化天气文本 (wttr.in)
+                    // ============================================
+                    const timeHack = new Date().getTime();
+                    // 这里还是先获取文本报告
+                    const weatherUrl = `https://wttr.in/${encodeURIComponent(city)}?format=%C|%t|%f|%h|%w|%u|%P|%v&lang=zh-cn&t=${timeHack}`;
+
+                    const res = await fetch(weatherUrl);
+                    let report = "";
+
+                    // 处理 wttr.in 的响应
+                    if (res.status === 200) {
+                        const rawText = await res.text();
+                        if (rawText.includes("already being processed") || rawText.includes("Sorry") || rawText.length < 5) {
+                            report = `🌍 **${city}** (天气文本暂时无法获取)\n`;
+                        } else {
+                            const data = rawText.split("|");
+                            if (data.length >= 8) {
+                                // 汉化处理
+                                let weatherText = data[0].trim();
+                                const translationFix = {
+                                    "Shower in vicinity": "附近有阵雨", "Rain in vicinity": "附近有雨",
+                                    "Thunderstorm in vicinity": "附近有雷暴", "Smoke": "烟雾", "Haze": "霾",
+                                    "Dust": "浮尘", "Sand": "沙尘", "Mist": "薄雾", "Fog": "雾",
+                                    "Clear": "晴", "Sunny": "晴朗", "Partly cloudy": "局部多云",
+                                    "Cloudy": "多云", "Overcast": "阴", "Light rain": "小雨",
+                                    "Moderate rain": "中雨", "Heavy rain": "大雨", "Light snow": "小雪",
+                                    "Moderate snow": "中雪", "Heavy snow": "大雪", "Sleet": "雨夹雪",
+                                    "Patchy rain possible": "可能有雨", "Thundery outbreaks possible": "可能有雷雨"
+                                };
+                                if (translationFix[weatherText]) weatherText = translationFix[weatherText];
+
+                                report = `🌍 ${city}的实时天气\n`;
+                                report += `🌤️ 天气：${weatherText}\n`;
+                                report += `🌡️ 温度：${data[1].trim().replace('+', '')}\n`;
+                                report += `🤔 体感：${data[2].trim().replace('+', '')}\n`;
+                                report += `💧 湿度：${data[3].trim()}\n`;
+                                report += `🌬️ 风速：${data[4].trim()}\n`;
+
+                                // === 修改：精准地面气压 (Open-Meteo 增强版) ===
+                                try {
+                                    let lat = null;
+                                    let lng = null;
+                                    const cleanCity = city.replace(/[市区县]/g, "");
+
+                                    // 步骤A：尝试 Open-Meteo 搜索城市
+                                    try {
+                                        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanCity)}&count=1&language=zh&format=json`;
+                                        const geoRes = await fetch(geoUrl);
+                                        const geoJson = await geoRes.json();
+                                        if (geoJson.results && geoJson.results.length > 0) {
+                                            lat = geoJson.results[0].latitude;
+                                            lng = geoJson.results[0].longitude;
+                                        }
+                                    } catch (e) { console.warn("Open-Meteo Geo 失败"); }
+
+                                    // 步骤B：如果 A 失败，尝试通过 wttr.in 获取坐标 (双重保险)
+                                    // 既然 wttr.in 能查到天气，它一定知道坐标
+                                    if (lat === null) {
+                                        try {
+                                            const wRes = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+                                            const wData = await wRes.json();
+                                            if (wData.nearest_area && wData.nearest_area.length > 0) {
+                                                lat = wData.nearest_area[0].latitude;
+                                                lng = wData.nearest_area[0].longitude;
+                                                console.log(`📍 已通过 wttr.in 修正坐标: ${lat}, ${lng}`);
+                                            }
+                                        } catch (e) { console.warn("Wttr Geo 失败"); }
+                                    }
+
+                                    let pressVal = null;
+
+                                    // 步骤C：只要拿到了坐标，就去查地面气压
+                                    if (lat !== null && lng !== null) {
+                                        const pressUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=surface_pressure`;
+                                        const pressRes = await fetch(pressUrl);
+                                        const pressJson = await pressRes.json();
+
+                                        if (pressJson.current && pressJson.current.surface_pressure) {
+                                            pressVal = pressJson.current.surface_pressure;
+                                        }
+                                    }
+
+                                    // 步骤D：写入数据
+                                    if (pressVal) {
+                                        // 成功拿到地面气压 (例如昆明应显示 810左右)
+                                        report += `🎈 气压：${pressVal} hPa (地面)`;
+                                    } else {
+                                        // 全都失败，回退显示海平面气压 (1015左右)
+                                        report += `🎈 气压：${data[6].trim()} (海平面)`;
+                                    }
+
+                                } catch (err) {
+                                    console.error("气压获取完全失败:", err);
+                                    report += `🎈 气压：${data[6].trim()}`;
+                                }
+                            }
+                        }
+                    }
+
+                    // ============================================
+                    // 🚀 AQI 混合策略：优先 WAQI -> 失败则 Open-Meteo
+                    // ============================================
+                    let aqiSuccess = false; // 标记是否成功获取到了数据
+
+                    // --- 【策略 A】优先尝试你的代码 (WAQI) ---
+                    try {
+                        const token = '8eb22fc66433b4f47fbc76b6c3b00a3375049fc2';
+                        const searchUrl = `https://api.waqi.info/search/?keyword=${encodeURIComponent(city)}&token=${token}`;
+                        const searchRes = await fetch(searchUrl);
+                        const searchJson = await searchRes.json();
+                        let aqiVal = null;
+
+                        if (searchJson.status === 'ok' && searchJson.data && searchJson.data.length > 0) {
+                            const limit = Math.min(searchJson.data.length, 5);
+                            for (let i = 0; i < limit; i++) {
+                                const station = searchJson.data[i];
+                                const val = parseInt(station.aqi);
+                                // 只要是有效数字，且不等于 "-"
+                                if (!isNaN(val) && station.aqi !== "-") {
+                                    aqiVal = val;
+                                    console.log(`✅ [策略A] WAQI 找到数据: ${val} (站点: ${station.station.name})`);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (aqiVal !== null) {
+                            // 如果找到了，直接生成报告并标记成功
+                            let level = "";
+                            if (aqiVal <= 50) level = "🟢(优)";
+                            else if (aqiVal <= 100) level = "🟡(良)";
+                            else if (aqiVal <= 150) level = "🟠(轻度)";
+                            else if (aqiVal <= 200) level = "🔴(中度)";
+                            else if (aqiVal <= 300) level = "🟣(重度)";
+                            else level = "☠️(严重)";
+
+                            report += `\n🌫️ 空气(AQI)：${aqiVal} ${level}`;
+                            report += `\n📡 数据源：地面监测站`;
+                            aqiSuccess = true; // 成功！不需要执行策略B了
+                        } else {
+                            console.log("⚠️ [策略A] WAQI 返回了结果但没有有效数值，准备切换策略B...");
+                        }
+                    } catch (e) {
+                        console.warn("⚠️ [策略A] WAQI 连接出错，准备切换策略B:", e);
+                    }
+
+                    // --- 【策略 B】Open-Meteo 兜底 (只有当策略A失败时才运行) ---
+                    if (!aqiSuccess) {
+                        console.log("🔄 启用 Open-Meteo 兜底方案...");
+                        try {
+                            let finalLat = null;
+                            let finalLon = null;
+
+                            // B1. 尝试 Open-Meteo Geocoding
+                            try {
+                                const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh&format=json`;
+                                const geoRes = await fetch(geoUrl);
+                                const geoJson = await geoRes.json();
+
+                                if (geoJson.results && geoJson.results.length > 0) {
+                                    finalLat = geoJson.results[0].latitude;
+                                    finalLon = geoJson.results[0].longitude;
+                                } else {
+                                    // 尝试去掉后缀再搜
+                                    const simpleCity = city.replace(/[市区县]/g, "");
+                                    if (simpleCity.length > 0) {
+                                        const geoUrl2 = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(simpleCity)}&count=1&language=zh&format=json`;
+                                        const geoRes2 = await fetch(geoUrl2);
+                                        const geoJson2 = await geoRes2.json();
+                                        if (geoJson2.results && geoJson2.results.length > 0) {
+                                            finalLat = geoJson2.results[0].latitude;
+                                            finalLon = geoJson2.results[0].longitude;
+                                        }
+                                    }
+                                }
+                            } catch (err) { console.warn("Geocoding failed"); }
+
+                            // B2. 如果 Open-Meteo 没找到坐标，问 wttr.in 要坐标
+                            if (finalLat === null) {
+                                try {
+                                    const wRes = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+                                    const wData = await wRes.json();
+                                    if (wData.nearest_area && wData.nearest_area.length > 0) {
+                                        finalLat = wData.nearest_area[0].latitude;
+                                        finalLon = wData.nearest_area[0].longitude;
+                                    }
+                                } catch (err) { console.warn("Wttr geo failed"); }
+                            }
+
+                            // B3. 只要有了坐标，就查 Open-Meteo AQI
+                            if (finalLat !== null && finalLon !== null) {
+                                const airUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${finalLat}&longitude=${finalLon}&current=us_aqi,pm2_5&timezone=auto`;
+                                const airRes = await fetch(airUrl);
+                                const airJson = await airRes.json();
+
+                                if (airJson.current && airJson.current.us_aqi !== undefined) {
+                                    const aqiVal = airJson.current.us_aqi;
+                                    const pm25 = airJson.current.pm2_5;
+
+                                    let level = "";
+                                    if (aqiVal <= 50) level = "🟢(优)";
+                                    else if (aqiVal <= 100) level = "🟡(良)";
+                                    else if (aqiVal <= 150) level = "🟠(轻度)";
+                                    else if (aqiVal <= 200) level = "🔴(中度)";
+                                    else if (aqiVal <= 300) level = "🟣(重度)";
+                                    else level = "☠️(严重)";
+
+                                    report += `\n🌫️ 空气(AQI)：${aqiVal} ${level}`;
+                                    report += `\n😷 PM2.5：${pm25} µg/m³ (卫星估算)`;
+                                    aqiSuccess = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error("兜底方案也失败了:", e);
+                        }
+                    }
+
+                    // 如果两个策略全挂了
+                    if (!aqiSuccess) {
+                        report += `\n🌫️ 空气(AQI)：暂无数据`;
+                    }
+                    // =========== 👇【修改处 2：插入开始】👇 ===========
+                    clearTimeout(waitTimer); // 数据处理完了，清除定时器
+                    // =========== 👆【修改处 2：插入结束】👆 ===========
+
+                    return report;
+
+                } catch (e) {
+                    console.error(e);
+                    // =========== 👇【修改处 3：插入开始】👇 ===========
+                    clearTimeout(waitTimer); // 报错了也要清除定时器
+                    // =========== 👆【修改处 3：插入结束】👆 ===========
+                    return "我现在无法连接网络，看不了天气。";
+                }
+            }
             // 入口函数
             async process(input) {
                 if (!input) return null;
-                input = input.trim();
+                let text = input.trim();
+                let processedInput = this.preprocess(text);
+                const weatherRes = await this.checkWeather(text); // 传入原始文本，方便提取城市
+                if (weatherRes) return this.humanize(weatherRes);
 
-                // 1. 预处理 (用于情绪分析和后续的通用匹配)
-                const processedInput = this.preprocess(input);
+                // ===============================================
+                // 🧠 1. 逆向关键词捕捉 (核心升级)
+                // ===============================================
+                // 不管用户说什么，先看看句子里有没有我们认识的“名词”
+                // 比如用户说 "我觉得原神很难玩"，我们立刻发现 "原神" 并锁定
+                for (let item of this.db) {
+                    // 只把长度小于5的词当作“话题名词”，防止匹配到长句子
+                    if (item.q.length <= 5 && processedInput.includes(item.q)) {
+                        this.memory.lastTopic = item.q;
+                        console.log(`🎯 从长句中捕获话题: "${item.q}"`);
+                        break; // 找到一个就够了
+                    }
+                }
 
-                // 2. 情绪分析 (确保即使在只说名字时也能记录情绪)
-                this.analyzeSentiment(processedInput);
-
-                // 3. 记忆提取与优先响应 (★★★ 修复核心 ★★★)
-                // 这里使用原始 input 进行匹配，确保名字不被预处理修改
-                // 如果提取到了名字，extractMemory 现在会直接返回欢迎语
-                const memoryRes = this.extractMemory(input);
-                if (memoryRes) return this.humanize(memoryRes);
-
-                // 4. 逻辑计算
-                const logicRes = this.tryLogic(input);
-                if (logicRes) return logicRes;
-
-                // 5. 数据库搜索
-                const dbRes = this.searchDatabase(processedInput);
+                // ===============================================
+                // 🔍 2. 优先尝试精准/模糊匹配 (全句搜索)
+                // ===============================================
+                let dbRes = this.searchDatabase(processedInput);
                 if (dbRes) return this.humanize(dbRes);
 
-                // 6. 模式匹配 (处理其他对话模式)
+                // ===============================================
+                // 🔗 3. 话题 + 通用逻辑 (省去大量数据库工作)
+                // ===============================================
+                if (this.memory.lastTopic) {
+                    // 如果我们知道当前在聊什么 (lastTopic)，但用户问的具体问题库里没有
+                    // 比如 Topic="马斯克"，用户问 "帅吗"，库里没写 "马斯克帅吗"
+
+                    // 我们可以定义一些“通用回答逻辑”
+                    if (processedInput.includes("谁")) {
+                        // 自动跳回话题本身的定义 (db里 item.q="马斯克" 的那个回答)
+                        let topicDef = this.searchDatabase(this.memory.lastTopic);
+                        if (topicDef) return `关于${this.memory.lastTopic}：` + topicDef;
+                    }
+
+                    // 尝试拼接搜索 (最后的保底)
+                    // 比如 lastTopic="苹果", Input="好吃吗" -> 搜 "苹果好吃吗"
+                    const contextInput = this.memory.lastTopic + processedInput;
+                    let contextRes = this.searchDatabase(contextInput);
+                    if (contextRes) return this.humanize(contextRes);
+                }
+
+                // ... 后续常规流程 (情感分析、模式匹配、兜底) ...
+                this.analyzeSentiment(processedInput);
                 const patternRes = this.matchPattern(processedInput);
                 if (patternRes) return this.humanize(patternRes);
 
-                // 7. 兜底回复
                 return this.humanize(getPokerFallback());
             }
             // === 核心升级 1: 预处理同义词 (让它听懂各种说法) ===
@@ -1761,11 +2060,24 @@
             const bubbleDiv = document.createElement('div');
             bubbleDiv.className = `bubble ${role}-bubble`;
 
-            // ★★★ 最终修正：无论是否有 <ul>，一律作为纯文本处理 ★★★
-            // 配合 CSS 的 white-space: pre-wrap，列表可以用换行符 \n 来模拟
-            bubbleDiv.textContent = text;
+            // === 🛡️ 核心修复：智能解析格式 ===
+            if (role === 'user') {
+                // 用户发的消息：保持纯文本（防止用户输入恶意代码）
+                bubbleDiv.textContent = text;
+            } else {
+                // AI 发的消息：启用“富文本”模式
+                // 1. 先把可能存在的 <br> 统一处理为换行符
+                let formatted = text.replace(/<br>/gi, '\n');
 
-            // 删除掉之前那个 if (text.includes('<ul>')) ... innerHTML 的块
+                // 2. 把 **文字** 替换为 <b>文字</b> (加粗)
+                formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+                // 3. 最后把所有的换行符 \n 变成 <br> 标签
+                formatted = formatted.replace(/\n/g, '<br>');
+
+                // 4. 使用 innerHTML 渲染，这样浏览器就能看懂标签了
+                bubbleDiv.innerHTML = formatted;
+            }
 
             if (role === 'ai') {
                 row.appendChild(avatarDiv);
@@ -1832,14 +2144,14 @@
 
         // 1. 禁止右键菜单
         //document.oncontextmenu = function (e) {
-            //e.preventDefault();
-           // return false;
+        //e.preventDefault();
+        // return false;
         //};
 
         // 2. 禁止文本选中拖拽
         //document.onselectstart = function (e) {
-           // e.preventDefault();
-           // return false;
+        // e.preventDefault();
+        // return false;
         //};
 
         // 3. 拦截所有常见的开发者工具快捷键
