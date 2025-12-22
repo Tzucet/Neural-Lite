@@ -1505,8 +1505,8 @@
                     // --- 【策略 A】优先尝试你的代码 (WAQI) ---
                     try {
                         // 修改：不再直接请求 waqi，而是请求我们刚刚创建的 Cloudflare Function
-// 这里的 /api/waqi 对应刚才创建的文件路径 functions/api/waqi.js
-const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
+                        // 这里的 /api/waqi 对应刚才创建的文件路径 functions/api/waqi.js
+                        const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
                         const searchRes = await fetch(searchUrl);
                         const searchJson = await searchRes.json();
                         let aqiVal = null;
@@ -2063,20 +2063,26 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
 
             // === 🛡️ 核心修复：智能解析格式 ===
             if (role === 'user') {
-                // 用户发的消息：保持纯文本（防止用户输入恶意代码）
+                // 用户消息保持纯文本
                 bubbleDiv.textContent = text;
             } else {
-                // AI 发的消息：启用“富文本”模式
-                // 1. 先把可能存在的 <br> 统一处理为换行符
-                let formatted = text.replace(/<br>/gi, '\n');
+                // AI 消息：先对原始文本进行 HTML 转义，防止恶意脚本注入
+                let safeText = text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
 
-                // 2. 把 **文字** 替换为 <b>文字</b> (加粗)
+                // 2. 在转义后的文本上，安全地应用格式化
+                // 把换行符变成 <br>
+                let formatted = safeText.replace(/\n/g, '<br>');
+
+                // 把 **文字** 变成 <b>文字</b>
+                // 注意：因为 < 和 > 已经被转义了，这里手动添加的 <b> 标签是安全的
                 formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
-                // 3. 最后把所有的换行符 \n 变成 <br> 标签
-                formatted = formatted.replace(/\n/g, '<br>');
-
-                // 4. 使用 innerHTML 渲染，这样浏览器就能看懂标签了
+                // 3. 渲染
                 bubbleDiv.innerHTML = formatted;
             }
 
@@ -2140,20 +2146,10 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
     </script>
     <script>
         // =========================================
-        // 🛡️ 网页源码保护系统 (增强版)
+        // 网页源码保护系统 
         // =========================================
 
-        // 1. 禁止右键菜单
-        //document.oncontextmenu = function (e) {
-        //e.preventDefault();
-        // return false;
-        //};
 
-        // 2. 禁止文本选中拖拽
-        //document.onselectstart = function (e) {
-        // e.preventDefault();
-        // return false;
-        //};
 
         // 3. 拦截所有常见的开发者工具快捷键
         document.onkeydown = function (e) {
@@ -2198,7 +2194,7 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
             }
         };
 
-        // 4🔥 升级版防调试：检测到暂停立刻自毁
+        // 4:防调试
         (function antiDebug() {
             var checkStatus = function () {
                 var start = new Date().getTime();
@@ -2216,7 +2212,7 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
                     document.body.innerHTML = '<h1 style="color:red;margin:20% auto;text-align:center;">Illegal Debugging Detected</h1>';
                     document.body.style.background = "#000";
 
-                    // 甚至可以恶意跳转
+                    // 
                     // window.location.href = "about:blank";
                 }
             };
@@ -2225,13 +2221,13 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
             setInterval(checkStatus, 1000);
         })();
 
-        // 5. 废掉控制台输出 (Console Ban)
+        // 5.  (Console Ban)
         try {
             var consoleBan = function () { };
             // 锁定 console 对象，禁止被重新赋值
             Object.defineProperty(window, 'console', {
                 get: function () {
-                    if (window._command) return window._originalConsole; // 留个后门给自己（可选）
+                    if (window._command) return window._originalConsole;
                     return {
                         log: consoleBan,
                         info: consoleBan,
@@ -2247,22 +2243,7 @@ const searchUrl = `/api/waqi?city=${encodeURIComponent(city)}`;
             });
         } catch (e) { }
 
-        // 6. 蜜罐陷阱 (Honey Pot)
-        // 这是一个假的变量，诱惑黑客去修改
-        var userLevel = 1;
-        var adminAccess = false;
 
-        Object.defineProperty(window, 'adminAccess', {
-            get: function () { return false; },
-            set: function (val) {
-                // 一旦有人试图设置 adminAccess = true
-                if (val) {
-                    document.body.innerHTML = '<h1>Illegal Operation Detected</h1>';
-                    // 触发死循环炸弹
-                    while (true) { };
-                }
-            }
-        });
 
 
 
