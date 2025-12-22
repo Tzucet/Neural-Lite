@@ -15,7 +15,7 @@ export async function onRequest(context) {
     }
 
     // 3. 服务端发起请求，带上 Token
-    const targetUrl = `https://api.waqi.info/search/?keyword=${encodeURIComponent(city)}&token=${token}`;
+    const targetUrl = `https://api.waqi.info/search/?keyword=${encodeURIComponent(city)}&token=8eb22fc66433b4f47fbc76b6c3b00a3375049fc2${token}`;
 
     try {
         const apiResponse = await fetch(targetUrl);
