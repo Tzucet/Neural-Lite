@@ -1275,24 +1275,38 @@
         async function initAudioSystem() {
             const decode = (key, base64Str) => {
                 try {
-                    // 1. 转换 Base64 为二进制 Buffer
                     const arrayBuffer = base64ToArrayBuffer(base64Str);
-                    // 2. 解码音频
                     audioCtx.decodeAudioData(arrayBuffer, (decoded) => {
                         soundBuffers[key] = decoded;
-                        // 恢复控制台后，这里能看到成功提示
-                        if (window.console && console.log) console.log(`✅ [音效] ${key} 预解码完成`);
+                        // ★★★ 新增：解码一旦完成，立刻用 0 音量“空放”一次 ★★★
+                        // 这能让音频数据提前加载到内存热区，真正点击时就是瞬发
+                        try {
+                            const source = audioCtx.createBufferSource();
+                            source.buffer = decoded;
+                            const silentGain = audioCtx.createGain();
+                            silentGain.gain.value = 0; // 静音
+                            source.connect(silentGain);
+                            silentGain.connect(audioCtx.destination);
+                            source.start(0);
+                        } catch(e) {}
+                        
+                        if (window.console && console.log) console.log(`✅ [音效] ${key} 预热完成`);
                     }, (err) => {
-                        if (window.console && console.error) console.error(`❌ [音效] ${key} 解码失败: 数据损坏或格式不支持`, err);
+                        console.error(`❌ [音效] ${key} 解码失败`, err);
                     });
                 } catch (e) {
-                    if (window.console && console.error) console.error(`❌ [音效] ${key} 转换错误`, e);
+                    console.error(`❌ [音效] ${key} 转换错误`, e);
                 }
             };
-            // 并行处理
+            
+            // ★★★ 调整顺序：优先解码发送音效，因为用户最先用到它 ★★★
             decode('sent', SENT_SOUND_DATA);
-            decode('recv', RECV_SOUND_DATA);
-            decode('switch', SWITCH_SOUND_DATA);
+            
+            // 稍微延迟一点解码其他音效，让出 CPU 给主界面渲染
+            setTimeout(() => {
+                decode('recv', RECV_SOUND_DATA);
+                decode('switch', SWITCH_SOUND_DATA);
+            }, 200);
         }
         // 立即启动预加载
         initAudioSystem();
