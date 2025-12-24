@@ -1126,10 +1126,72 @@
             will-change: transform, opacity, filter;
             /* 保持你原有的其他样式 (width, height, background 等) 不变 */
         }
+
+        /* === 修复：页面加载时禁止动画 (防闪烁) === */
+        .preload,
+        .preload * {
+            transition: none !important;
+        }
+
+        /* =========================================
+           🌗 新增：Aqua 平滑主题过渡系统 (Theme Transition)
+           实现类似 OS X 系统偏好设置切换时的柔和渐变
+           ========================================= */
+        body,
+        .window-frame,
+        .header,
+        .header h1,
+        .status,
+        .win-btn,
+        #chat-container,
+        .bubble,
+        .input-wrapper,
+        input,
+        button,
+        .avatar,
+        .modal-window,
+        .modal-content,
+        ::-webkit-scrollbar-track,
+        ::-webkit-scrollbar-thumb {
+            /* 0.35s: 经典的 OS X 窗口变换时间
+               cubic-bezier(0.4, 0, 0.2, 1): 
+               这是 Apple 经典的 "Sine Ease In Out" 曲线，
+               起步稍慢，中间加速，结尾平滑减速，具有“物理重量感”，
+               非常符合拟物化（Skeuomorphic）风格。
+            */
+            transition:
+                background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                background-image 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                text-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                filter 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 修复：防止红绿灯按钮在过渡时背景闪烁
+           特定针对渐变背景的平滑处理 
+        */
+        .close,
+        .min,
+        .max {
+            transition: background 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s;
+        }
     </style>
 </head>
 
-<body>
+<body class="preload">
+    <script>
+        (function () {
+            // 1. 检查是不是暗色模式 (读取存档 或 系统设置)
+            var isDark = localStorage.getItem('neural_lite_theme') === 'dark' ||
+                (!localStorage.getItem('neural_lite_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            // 2. 如果是暗色，立刻强行写入 CSS 覆盖默认的白色背景
+            if (isDark) {
+                document.write('<style id="anti-flash">body { background-color: #1a1a1a !important; background-image: none !important; }</style>');
+            }
+        })();
+    </script>
     <div class="window-frame">
         <div class="header">
             <div class="window-controls">
@@ -2624,6 +2686,17 @@
                 minBtn.style.cursor = 'pointer';
                 minBtn.title = "切换日/夜模式"; // 鼠标悬停提示
                 minBtn.onclick = toggleDarkMode;
+            }
+        }, 100);
+        // 核心修复：等页面彻底渲染完颜色后，再开启过渡动画 (延迟 100ms)
+        // 核心修复：等页面彻底渲染完后 (100ms)，做两件事：
+        // 1. 开启过渡动画 (移除 preload)
+        // 2. 销毁防闪烁的临时样式 (移除 anti-flash)，否则切换浅色模式会被锁死在黑色
+        setTimeout(() => {
+            document.body.classList.remove('preload');
+            var antiFlashStyle = document.getElementById('anti-flash');
+            if (antiFlashStyle) {
+                antiFlashStyle.remove();
             }
         }, 100);
         // =========================================
