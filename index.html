@@ -1178,20 +1178,22 @@
             transition: background 0.35s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s;
         }
     </style>
-</head>
-
-<body class="preload">
     <script>
         (function () {
-            // 1. 检查是不是暗色模式 (读取存档 或 系统设置)
+            // 1. 读取配置
             var isDark = localStorage.getItem('neural_lite_theme') === 'dark' ||
                 (!localStorage.getItem('neural_lite_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            // 2. 如果是暗色，立刻强行写入 CSS 覆盖默认的白色背景
+            
+            // 2. 如果是暗色，立刻在 DOM 渲染前强行注入样式
+            // 关键：同时设置 html 和 body 背景为深色，防止任何缝隙露白
             if (isDark) {
-                document.write('<style id="anti-flash">body { background-color: #1a1a1a !important; background-image: none !important; }</style>');
+                document.write('<style id="anti-flash">html, body { background-color: #1a1a1a !important; background-image: none !important; }</style>');
             }
         })();
     </script>
+</head>
+
+<body class="preload">
     <div class="window-frame">
         <div class="header">
             <div class="window-controls">
